@@ -8,10 +8,10 @@
 # API_SECRET=foobarbaazquux
 
 # TODO: safer way to read CFGFILE than "source CFGFILE"
+# TODO: what is the API_URL for libre.fm?
 # TODO: sensing too-frequent posting 
 # TODO: avoid redundant posting; GET method=track.updateNowPlaying first?
 # TODO: optional love/unlove toggle
-
 
 CFGFILE=$HOME/.config/bash-scrobbler
 API_URL="https://ws.audioscrobbler.com/2.0/"
@@ -66,14 +66,15 @@ init_2(){
 
 scrobble(){
 	local now tmpfile params http_params i api_sig
-	now=${3:-$(printf '%(%s)T')}
 	if [ -z "$2" ]; then
 		echo >&2 "need \"artist name\" and \"song name\" as parameters"
 		return 1;
 	fi
 	tmpfile=$(mktemp)
+	now=$(printf '%(%s)T')
 	params=( "method=track.scrobble" )
-	params+=("artist=$1" "track=$2" "timestamp=$now" )
+	params+=( "artist=$1" "track=$2" "timestamp=$now" )
+	[ -n "$3" ] && params+=( "album=$3" )
 	params+=( "api_key=${API_KEY}" "sk=${SESSION_KEY}" )
 	http_params=()
 	for i in "${params[@]}"; do
@@ -88,22 +89,27 @@ scrobble(){
 		rm "$tmpfile"
 		return 1
 	fi
+	[ -t 0 ] && cat "$tmpfile"  # see the response if used on a tty
 	rm "$tmpfile"
 }
 
 usage(){
-	echo >&2 "Usage: $0 [init | artistname trackname ]"
+	echo >&2 "Usage: $0 [init | artistname songname [albumname] ]"
 	echo >&2 "       init: Creates a new config file w/ session token"
-	echo >&2 "       artistname trackname: does a scrobble. remember to enclose these two strings in quotes"
+	echo >&2 "       artist song album: does a scrobble. remember to enclose each string in \"quotes\""
 }
 
 
 # -- main
+if ! command -v curl >/dev/null; then
+	echo >&2 "I need curl to do https communication; aborting."
+	exit 1
+fi
 # shellcheck disable=SC1090
 source "$CFGFILE"  # TODO test if it's safe before launching it
-if [ $# -eq 2 ]; then
+if [ $# -eq 2 ] || [ $# -eq 3 ]; then
 	if [ -n "$SESSION_KEY" ]; then
-		scrobble "$1" "$2"
+		scrobble "$1" "$2" "$3"
 	else
 		echo >&2 "Missing session key; did you try 'init' yet?"
 		usage

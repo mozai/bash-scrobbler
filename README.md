@@ -18,11 +18,13 @@ Install
   It will attempt to open a webbrowser, but also print the URL so you can
   load it up youself.
 
-If you're using this with MOC, here's some extra steps:
+### Using with MOC
 - edit $HOME/.moc/config to add these two lines:  
-  `OnSongChange = "/path/to/bash-scrobbler %a %t"
-  `RepeatSongChange = yes"
-- `mocp -x` to force a restart of the daemon
+  ```
+  OnSongChange = "/path/to/bash-scrobbler %a %t %r"
+  RepeatSongChange = "yes"
+  ```
+- `mocp -x` to force a restart of the daemon after making config changes.
 
 MOC's "OnSongChange" feature isnt documented in the readme files nor
 man pages.  To save you reading [the source
@@ -44,8 +46,11 @@ Todo
 ----
 - optional third parameter for album name
 - safer way to read CFGFILE than "source CFGFILE"
+- option to post to libre.fm instead of last.fm; maybe both?
 - sense too-frequent posting 
 - avoid redundant posting; GET method=track.updateNowPlaying first?
+- sense if user is listening to an http(s) stream, and add the
+  Last.FM parmeter "chosenByUser=0"
 - option for love/unlove toggle
 
 
