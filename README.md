@@ -37,9 +37,9 @@ Usage
 -----
 After a successful init, and the config settings are stowed in ~/.config/bash-scrobbler:
 
-`bash-scrobbler "Toby Fox" "MeGaLoVania"`  
+`bash-scrobbler "Toby Fox" "MeGaLoVania" "Homestuck Vol. 6: Heir Transparent"`  
 `bash-scrobbler "Boa" "Duvet"`  
-`bash-scrobbler "Battery" "The Chauffeur"`  
+`bash-scrobbler "Battery" "The Chauffeur" "Newer Wave"`  
 
 
 Todo
