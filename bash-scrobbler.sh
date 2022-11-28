@@ -50,7 +50,7 @@ init_1(){
 
 init_2(){
 	tmpfile=$(mktemp)
-	declare -a params
+	local -a params
 	params=( "api_key=${API_KEY}" "method=auth.getSession" "token=${TOKEN}" )
 	API_SIG=$(mk_API_SIG "${params[@]}")
 	curl -s "${API_URL}?api_key=${API_KEY}&method=auth.getSession&token=${TOKEN}&api_sig=${API_SIG}&format=json" >"$tmpfile"
@@ -59,6 +59,7 @@ init_2(){
 		echo "SESSION_KEY=${SESSION_KEY}" >>"$CFGFILE"
 		echo "Init completed. You may now use this program to scrobble tracks."
 	else
+		echo >&2 "auth.getSession failed"
 		cat >&2 "$tmpfile"
 		return 1
 	fi 
@@ -72,19 +73,24 @@ scrobble(){
 	fi
 	tmpfile=$(mktemp)
 	now=$(printf '%(%s)T')
-	params=( "method=track.scrobble" )
-	params+=( "artist=$1" "track=$2" "timestamp=$now" )
+	local -a params
+	params=( "api_key=${API_KEY}" )
+	params+=( "sk=${SESSION_KEY}" )
+	params+=( "method=track.scrobble" )
 	[ -n "$3" ] && params+=( "album=$3" )
-	params+=( "api_key=${API_KEY}" "sk=${SESSION_KEY}" )
+	params+=( "artist=$1" )
+	params+=( "timestamp=$now" )
+	params+=( "track=$2" )
 	http_params=()
 	for i in "${params[@]}"; do
-		http_params+=( "--data" "$i" )
+		http_params+=( "--data-urlencode" "$i" )
 	done
 	api_sig=$(mk_API_SIG "${params[@]}")
 	http_params+=("--data" "api_sig=${api_sig}")
 	curl -s -m3 -X POST "https://ws.audioscrobbler.com/2.0/" \
 		-H "Connection: close" "${http_params[@]}" >"$tmpfile"
 	if ! grep -q '<lfm status="ok">' "$tmpfile"; then
+		echo >&2 "track.scrobble failed"
 		cat >&2 "$tmpfile"
 		rm "$tmpfile"
 		return 1
@@ -95,8 +101,8 @@ scrobble(){
 
 usage(){
 	echo >&2 "Usage: $0 [init | artistname songname [albumname] ]"
-	echo >&2 "       init: Creates a new config file w/ session token"
-	echo >&2 "       artist song album: does a scrobble. remember to enclose each string in \"quotes\""
+	echo >&2 "Usage: $0 artist words - title words [ - album words ]"
+	echo >&2 "    Tell Last.FM what you're currently listening to."
 }
 
 
@@ -107,16 +113,55 @@ if ! command -v curl >/dev/null; then
 fi
 # shellcheck disable=SC1090
 source "$CFGFILE"  # TODO test if it's safe before launching it
-if [ $# -eq 2 ] || [ $# -eq 3 ]; then
-	if [ -n "$SESSION_KEY" ]; then
-		scrobble "$1" "$2" "$3"
-	else
-		echo >&2 "Missing session key; did you try 'init' yet?"
-		usage
-		exit 1;
+if [ -z "$SESSION_KEY" ]; then
+	echo >&2 "Missing session key; did you try 'init' yet?"
+	usage
+	exit 1;
+fi
+
+# parse args
+#  $0 "artist name" "song name"
+#  $0 "artist name" "song name" "album name"
+#  $0 artist name - song name
+#  $0 artist name - song name - album name
+declare founddash
+for f in "$@"; do
+	if [ "$f" == "-" ]; then
+		founddash=1
+		break
 	fi
-elif [ $# -eq 1 ] && [ "$1" == "init" ]; then
+done
+if [ -n "$founddash" ]; then
+	declare hopper artist title album
+	for f in "$@"; do
+		if [ "$f" == "-" ] && [ -z "$artist" ]; then
+			artist=${hopper% }
+			hopper=""
+		elif [ "$f" == "-" ] && [ -z "$title" ]; then
+			title=${hopper% }
+			hopper=""
+		else
+			hopper+="$f "
+		fi
+	done
+	if [ -z "$title" ]; then
+		title=${hopper% }; hopper=""
+	else
+		album=${hopper% }
+	fi
+else
+	if [ $# -eq 2 ] || [ $# -eq 3 ]; then
+		artist=$1; title=$2; album=$3;
+	else
+		usage;
+		exit 1
+	fi
+fi
+
+if [ $# -eq 1 ] && [ "$1" == "init" ]; then
 	init;
+elif [ -n "$title" ]; then
+	scrobble "$artist" "$title" "$album"
 else
 	usage
 	exit 1
